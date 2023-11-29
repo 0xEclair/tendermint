@@ -136,12 +136,16 @@ func (blockExec *BlockExecutor) ApplyBlock(
 		return state, 0, ErrInvalidBlock(err)
 	}
 
-	startTime := time.Now().UnixNano()
+	startTime := time.Now()
 	abciResponses, err := execBlockOnProxyApp(
 		blockExec.logger, blockExec.proxyApp, block, blockExec.store, state.InitialHeight,
 	)
-	endTime := time.Now().UnixNano()
-	blockExec.metrics.BlockProcessingTime.Observe(float64(endTime-startTime) / 1000000)
+	endTime := time.Now()
+	blockExec.metrics.BlockProcessingTime.Observe(float64(endTime.UnixNano()-startTime.UnixNano()) / 1000000)
+	sinceSec := endTime.Sub(startTime).Seconds()
+	blockExec.metrics.ExecuteBlockTime.Set(sinceSec)
+	blockExec.logger.Info("executed block", "height", block.Height, "duration", sinceSec)
+
 	if err != nil {
 		return state, 0, ErrProxyAppConn(err)
 	}
@@ -224,17 +228,22 @@ func (blockExec *BlockExecutor) Commit(
 		return nil, 0, err
 	}
 
+	start := time.Now()
 	// Commit block, get hash back
 	res, err := blockExec.proxyApp.CommitSync()
 	if err != nil {
 		blockExec.logger.Error("client error during proxyAppConn.CommitSync", "err", err)
 		return nil, 0, err
 	}
+	since := time.Since(start)
+	sinceSec := since.Seconds()
+	blockExec.metrics.CommitStateTime.Set(sinceSec)
 
 	// ResponseCommit has no error code - just data
 	blockExec.logger.Info(
 		"committed state",
 		"height", block.Height,
+		"duration", sinceSec,
 		"num_txs", len(block.Txs),
 		"app_hash", fmt.Sprintf("%X", res.Data),
 	)

@@ -17,6 +17,10 @@ const (
 type Metrics struct {
 	// Time between BeginBlock and EndBlock.
 	BlockProcessingTime metrics.Histogram
+	// Time for executing block.
+	ExecuteBlockTime metrics.Gauge
+	// Time for committing state.
+	CommitStateTime metrics.Gauge
 }
 
 // PrometheusMetrics returns Metrics build using Prometheus client library.
@@ -35,6 +39,18 @@ func PrometheusMetrics(namespace string, labelsAndValues ...string) *Metrics {
 			Help:      "Time between BeginBlock and EndBlock in ms.",
 			Buckets:   stdprometheus.LinearBuckets(1, 10, 10),
 		}, labels).With(labelsAndValues...),
+		ExecuteBlockTime: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "execute_block_time",
+			Help:      "Time for executing block.",
+		}, labels).With(labelsAndValues...),
+		CommitStateTime: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "commit_state_time",
+			Help:      "Time for committing state.",
+		}, labels).With(labelsAndValues...),
 	}
 }
 
@@ -42,5 +58,7 @@ func PrometheusMetrics(namespace string, labelsAndValues ...string) *Metrics {
 func NopMetrics() *Metrics {
 	return &Metrics{
 		BlockProcessingTime: discard.NewHistogram(),
+		ExecuteBlockTime: discard.NewGauge(),
+		CommitStateTime: discard.NewGauge(),
 	}
 }
